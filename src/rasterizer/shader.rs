@@ -1,11 +1,14 @@
 use super::vertex_data::VertexData;
 use glm::{Mat3, Mat4, Vec2, Vec3, Vec4};
 use nalgebra_glm as glm;
-use std::collections::HashMap;
+use std::{
+    collections::{hash_map::DefaultHasher, HashMap},
+    hash::{Hash, Hasher},
+};
 
 pub type VertexShader =
     fn(uniform: &ShaderData, vertex: &VertexData, output: &mut ShaderData) -> Vec4;
-pub type FragmentShader = fn(uniform: &ShaderData, input: &ShaderData) -> Vec4;
+pub type FragmentShader = fn(uniform: &ShaderData, input: &ShaderDataIterpolator) -> Vec4;
 
 pub(super) trait Interpolate {
     fn interpolate(v0: &Self, v1: &Self, v2: &Self, r0: f32, r1: f32, r2: f32) -> Self;
@@ -22,7 +25,7 @@ pub enum ShaderField {
     Vector4(Vec4),
     Matrix3(Mat3),
     Matrix4(Mat4),
-    Texture(Box<dyn Texture>),
+    Texture(Box<dyn Texture + Sync + Send>),
 }
 
 impl ShaderField {
@@ -68,7 +71,7 @@ impl ShaderField {
             panic!();
         }
     }
-    pub fn texture(&self) -> &Box<dyn Texture> {
+    pub fn texture(&self) -> &Box<dyn Texture + Sync + Send> {
         if let Self::Texture(v) = self {
             return v;
         } else {
@@ -98,22 +101,60 @@ impl Interpolate for ShaderField {
 }
 
 pub struct ShaderData {
-    fields: HashMap<String, ShaderField>,
+    fields: [(u64, ShaderField); 8],
 }
 
 impl ShaderData {
+    const INVALID_HASH: u64 = 0;
+
     pub fn new() -> Self {
         Self {
-            fields: HashMap::new(),
+            fields: [
+                (Self::INVALID_HASH, ShaderField::Number(0.0)),
+                (Self::INVALID_HASH, ShaderField::Number(0.0)),
+                (Self::INVALID_HASH, ShaderField::Number(0.0)),
+                (Self::INVALID_HASH, ShaderField::Number(0.0)),
+                (Self::INVALID_HASH, ShaderField::Number(0.0)),
+                (Self::INVALID_HASH, ShaderField::Number(0.0)),
+                (Self::INVALID_HASH, ShaderField::Number(0.0)),
+                (Self::INVALID_HASH, ShaderField::Number(0.0)),
+            ],
         }
     }
 
     pub fn set(&mut self, name: &str, field: ShaderField) {
-        self.fields.insert(name.to_owned(), field);
+        let key_hash = Self::hash_key(name);
+        for f in self.fields.iter_mut() {
+            if f.0 == Self::INVALID_HASH {
+                f.0 = key_hash;
+                f.1 = field;
+                return;
+            }
+        }
+        panic!();
+    }
+
+    pub fn set_indexed(&mut self, index: usize, field: ShaderField) {
+        self.fields[index] = ((index + 1) as u64, field);
     }
 
     pub fn get(&self, name: &str) -> Option<&ShaderField> {
-        self.fields.get(name)
+        let key_hash = Self::hash_key(name);
+        drop(name);
+        self.fields
+            .iter()
+            .find(|f| f.0 == key_hash)
+            .and_then(|f| Some(&f.1))
+    }
+
+    pub fn get_indexed(&self, index: usize) -> Option<&ShaderField> {
+        self.fields.get(index).map(|f| &f.1)
+    }
+
+    fn hash_key(key: &str) -> u64 {
+        let mut hasher = DefaultHasher::new();
+        key.hash(&mut hasher);
+        hasher.finish()
     }
 }
 
@@ -123,21 +164,60 @@ impl Default for ShaderData {
     }
 }
 
-impl Interpolate for ShaderData {
-    fn interpolate(v0: &Self, v1: &Self, v2: &Self, r0: f32, r1: f32, r2: f32) -> Self {
-        let mut new_fields = HashMap::new();
-        for (k, v) in v0.fields.iter() {
-            let interpolated = ShaderField::interpolate(
-                v,
-                &v1.fields.get(k).unwrap(),
-                &v2.get(k).unwrap(),
-                r0,
-                r1,
-                r2,
-            );
-            new_fields.insert(k.clone(), interpolated);
-        }
-        Self { fields: new_fields }
+// impl Interpolate for ShaderData {
+//     fn interpolate(v0: &Self, v1: &Self, v2: &Self, r0: f32, r1: f32, r2: f32) -> Self {
+//         let mut new_fields = HashMap::new();
+//         for (k, v) in v0.fields.iter() {
+//             let interpolated = ShaderField::interpolate(
+//                 v,
+//                 &v1.fields.get(k).unwrap(),
+//                 &v2.get(k).unwrap(),
+//                 r0,
+//                 r1,
+//                 r2,
+//             );
+//             new_fields.insert(k.clone(), interpolated);
+//         }
+//         Self { fields: new_fields }
+//     }
+// }
+
+pub struct ShaderDataIterpolator<'a> {
+    pub vertex0_data: &'a ShaderData,
+    pub vertex1_data: &'a ShaderData,
+    pub vertex2_data: &'a ShaderData,
+    pub vertex0_ratio: f32,
+    pub vertex1_ratio: f32,
+    pub vertex2_ratio: f32,
+}
+
+impl<'a> ShaderDataIterpolator<'a> {
+    pub fn get(&self, name: &str) -> Option<ShaderField> {
+        let field0 = self.vertex0_data.get(name)?;
+        let field1 = self.vertex1_data.get(name)?;
+        let field2 = self.vertex2_data.get(name)?;
+        Some(ShaderField::interpolate(
+            &field0,
+            &field1,
+            &field2,
+            self.vertex0_ratio,
+            self.vertex1_ratio,
+            self.vertex2_ratio,
+        ))
+    }
+
+    pub fn get_indexed(&self, index: usize) -> Option<ShaderField> {
+        let field0 = self.vertex0_data.get_indexed(index)?;
+        let field1 = self.vertex1_data.get_indexed(index)?;
+        let field2 = self.vertex2_data.get_indexed(index)?;
+        Some(ShaderField::interpolate(
+            &field0,
+            &field1,
+            &field2,
+            self.vertex0_ratio,
+            self.vertex1_ratio,
+            self.vertex2_ratio,
+        ))
     }
 }
 
@@ -168,7 +248,7 @@ impl ShaderProgram {
         (pos.xyz() / pos[3], data)
     }
 
-    pub(super) fn run_fragment(&self, uniform: &ShaderData, input: &ShaderData) -> Vec4 {
+    pub(super) fn run_fragment(&self, uniform: &ShaderData, input: &ShaderDataIterpolator) -> Vec4 {
         (&self.fragment)(uniform, input)
     }
 }

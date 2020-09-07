@@ -2,10 +2,10 @@ use glm::{Vec2, Vec3, Vec4};
 use nalgebra_glm as glm;
 
 pub struct Framebuffer {
-    width: u32,
-    height: u32,
-    color: Vec<Vec3>,
-    depth: Vec<f32>,
+    pub(super) width: u32,
+    pub(super) height: u32,
+    pub(super) color: Vec<Vec3>,
+    pub(super) depth: Vec<f32>,
 }
 
 impl Framebuffer {
@@ -88,7 +88,7 @@ impl Framebuffer {
 
     fn index_to_coords(&self, index: u32) -> (u32, u32) {
         let x = index % self.width;
-        let y = index / self.height;
+        let y = index / self.width;
         (x, y)
     }
 }

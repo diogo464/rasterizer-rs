@@ -453,6 +453,7 @@ dependencies = [
  "itertools",
  "nalgebra-glm",
  "rand",
+ "rayon",
 ]
 
 [[package]]

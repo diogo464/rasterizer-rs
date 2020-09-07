@@ -5,19 +5,16 @@ pub struct Framebuffer {
     pub(super) width: u32,
     pub(super) height: u32,
     pub(super) color: Vec<Vec3>,
-    pub(super) depth: Vec<f32>,
 }
 
 impl Framebuffer {
     pub fn new(width: u32, height: u32) -> Self {
         let size = (width * height) as usize;
         let color = vec![Vec3::default(); size];
-        let depth = vec![f32::MAX; size];
         Self {
             width,
             height,
             color,
-            depth,
         }
     }
 
@@ -47,39 +44,13 @@ impl Framebuffer {
         })
     }
 
-    pub fn depth(&self) -> impl Iterator<Item = (u32, u32, &f32)> {
-        self.depth.iter().enumerate().map(move |(i, d)| {
-            let (x, y) = self.index_to_coords(i as u32);
-            (x, y, d)
-        })
-    }
-
     pub fn get_color(&self, x: u32, y: u32) -> Option<&Vec3> {
         self.color.get(self.coords_to_index(x, y) as usize)
-    }
-
-    pub fn get_depth(&self, x: u32, y: u32) -> Option<&f32> {
-        self.depth.get(self.coords_to_index(x, y) as usize)
     }
 
     pub fn set_color(&mut self, x: u32, y: u32, color: &Vec3) {
         let index = self.coords_to_index(x, y) as usize;
         self.color[index] = *color;
-    }
-
-    pub fn set_depth(&mut self, x: u32, y: u32, depth: f32) {
-        let index = self.coords_to_index(x, y) as usize;
-        self.depth[index] = depth;
-    }
-
-    pub fn set_depth_if_greater(&mut self, x: u32, y: u32, depth: f32) -> bool {
-        let index = self.coords_to_index(x, y) as usize;
-        if self.depth[index] > depth {
-            self.depth[index] = depth;
-            true
-        } else {
-            false
-        }
     }
 
     fn coords_to_index(&self, x: u32, y: u32) -> u32 {

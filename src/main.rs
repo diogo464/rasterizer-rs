@@ -1,5 +1,7 @@
 #![feature(test)]
 #![feature(clamp)]
+#![feature(slice_fill)]
+
 
 pub mod obj;
 pub mod rasterizer;
@@ -79,6 +81,10 @@ fn main() {
     let start = std::time::Instant::now();
 
     rasterizer.render_model(&model, &shader, &uniform);
+    //rasterizer.render_model(&model, &shader, &uniform);
+    //rasterizer.render_model(&model, &shader, &uniform);
+    //rasterizer.render_model(&model, &shader, &uniform);
+    //rasterizer.render_model(&model, &shader, &uniform);
     //rasterizer.render_model(&model, &shader, &uniform);
     //rasterizer.render_model(&model, &shader, &uniform);
 

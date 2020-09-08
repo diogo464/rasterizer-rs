@@ -1,5 +1,6 @@
 mod bounding_box;
 mod framebuffer;
+mod frametime;
 mod model;
 mod point;
 mod shader;
@@ -9,6 +10,7 @@ use bounding_box::BoundingBox;
 use point::Point;
 
 pub use framebuffer::Framebuffer;
+pub use frametime::FrameTime;
 pub use model::{Model, ModelFace};
 pub use shader::{Interpolate, Shader, ShaderData, Texture};
 pub use vertex_data::VertexData;
@@ -31,6 +33,10 @@ struct Fragment {
 
 impl Fragment {
     const INVALID_FACE_INDEX: usize = usize::MAX;
+
+    fn is_valid(&self) -> bool {
+        self.face != Self::INVALID_FACE_INDEX
+    }
 }
 
 impl Default for Fragment {
@@ -120,50 +126,18 @@ struct ProcessedModelFace<DataType> {
     bounding_box: BoundingBox,
 }
 
-#[derive(Debug)]
-pub struct FrameTime {
-    time_vertex_shader: std::time::Duration,
-    time_rasterization: std::time::Duration,
-    time_fragment_shader: std::time::Duration,
-}
-
-impl FrameTime {
-    fn new() -> Self {
-        Self {
-            time_vertex_shader: std::time::Duration::new(0, 0),
-            time_rasterization: std::time::Duration::new(0, 0),
-            time_fragment_shader: std::time::Duration::new(0, 0),
-        }
-    }
-
-    pub fn geometry_stage(&self) -> &std::time::Duration {
-        &self.time_vertex_shader
-    }
-
-    pub fn rasterization_stage(&self) -> &std::time::Duration {
-        &self.time_rasterization
-    }
-
-    pub fn fragment_stage(&self) -> &std::time::Duration {
-        &self.time_fragment_shader
-    }
-
-    pub fn total(&self) -> std::time::Duration {
-        *self.geometry_stage() + *self.rasterization_stage() + *self.fragment_stage()
-    }
-}
-
 pub struct Rasterizer {
     framebuffer: Framebuffer,
     frame_blocks: Option<Vec<FrameBlock>>,
     frame_time: FrameTime,
+    frame_block_count: usize,
 }
 
 impl Rasterizer {
     const NORMALIZED_COORDS_MIN: f32 = -1.0;
     const NORMALIZED_COORDS_MAX: f32 = 1.0;
-    const BLOCK_SIZE: u32 = 96;
-    //2 5  5
+    const BLOCK_SIZE: u32 = 128;
+
     pub fn new(width: u32, height: u32) -> Self {
         let framebuffer = Framebuffer::new(width, height);
         let mut frame_blocks = Vec::new();
@@ -176,11 +150,12 @@ impl Rasterizer {
                 frame_blocks.push(FrameBlock::new(bb));
             }
         }
-
+        let block_count = frame_blocks.len();
         Self {
             framebuffer,
             frame_blocks: Some(frame_blocks),
-            frame_time: FrameTime::new(),
+            frame_time: FrameTime::zero(),
+            frame_block_count: block_count,
         }
     }
 
@@ -229,7 +204,7 @@ impl Rasterizer {
             }
         }
 
-        self.frame_time.time_vertex_shader = start.elapsed();
+        let vertex_shader_duration = start.elapsed();
         let start = std::time::Instant::now();
 
         frame_blocks.par_iter_mut().for_each(|block| {
@@ -238,44 +213,45 @@ impl Rasterizer {
                 .iter()
                 .map(|index| (*index, &processed_faces[*index]))
             {
-                //If they didnt overlap we wouldnt be rasterizing this face here
-                let rasterize_box = block.bounding_box.overlap(&face.bounding_box).unwrap();
-                let triangle_checker =
-                    TriangleInteriorChecker::new(&face.vertex0, &face.vertex1, &face.vertex2);
+                if let Some(rasterize_box) = block.bounding_box.overlap(&face.bounding_box) {
+                    let triangle_checker =
+                        TriangleInteriorChecker::new(&face.vertex0, &face.vertex1, &face.vertex2);
 
-                let y_iter = rasterize_box.y()..(rasterize_box.y() + rasterize_box.height());
-                let x_iter = rasterize_box.x()..(rasterize_box.x() + rasterize_box.width());
+                    let y_iter = rasterize_box.y()..(rasterize_box.y() + rasterize_box.height());
+                    let x_iter = rasterize_box.x()..(rasterize_box.x() + rasterize_box.width());
 
-                for (y, x) in y_iter.cartesian_product(x_iter) {
-                    let (nx, ny) = screen_to_normalized(x, y, self.width(), self.height());
-                    let triangle_point = triangle_checker.to_triangle_coords(&Vec2::new(nx, ny));
-                    if triangle_checker.is_point_in_triangle(&triangle_point) {
-                        let ratio_2 = triangle_point.x;
-                        let ratio_1 = triangle_point.y;
-                        let ratio_0 = 1.0 - ratio_1 - ratio_2;
-                        let fragment_depth = ratio_0 * face.vertex0.z
-                            + ratio_1 * face.vertex1.z
-                            + ratio_2 * face.vertex2.z;
-                        let fragment_index = {
-                            let fragment_x = x - block.bounding_box.x();
-                            let fragment_y = y - block.bounding_box.y();
-                            (fragment_x + fragment_y * block.bounding_box.width()) as usize
-                        };
+                    for (y, x) in y_iter.cartesian_product(x_iter) {
+                        let (nx, ny) = screen_to_normalized(x, y, self.width(), self.height());
+                        let triangle_point =
+                            triangle_checker.to_triangle_coords(&Vec2::new(nx, ny));
+                        if triangle_checker.is_point_in_triangle(&triangle_point) {
+                            let ratio_2 = triangle_point.y;
+                            let ratio_1 = triangle_point.x;
+                            let ratio_0 = 1.0 - ratio_1 - ratio_2;
+                            let fragment_depth = ratio_0 * face.vertex0.z
+                                + ratio_1 * face.vertex1.z
+                                + ratio_2 * face.vertex2.z;
+                            let fragment_index = {
+                                let fragment_x = x - block.bounding_box.x();
+                                let fragment_y = y - block.bounding_box.y();
+                                (fragment_x + fragment_y * block.bounding_box.width()) as usize
+                            };
 
-                        let fragment = &mut block.fragments[fragment_index];
-                        if fragment.depth > fragment_depth {
-                            fragment.depth = fragment_depth;
-                            fragment.face = face_index;
-                            fragment.vertex0_ratio = ratio_0;
-                            fragment.vertex1_ratio = ratio_1;
-                            fragment.vertex2_ratio = ratio_2;
+                            let fragment = &mut block.fragments[fragment_index];
+                            if fragment.depth > fragment_depth {
+                                fragment.depth = fragment_depth;
+                                fragment.face = face_index;
+                                fragment.vertex0_ratio = ratio_0;
+                                fragment.vertex1_ratio = ratio_1;
+                                fragment.vertex2_ratio = ratio_2;
+                            }
                         }
                     }
                 }
             }
         });
 
-        self.frame_time.time_rasterization = start.elapsed();
+        let rasterization_duration = start.elapsed();
         let start = std::time::Instant::now();
 
         //Fragment shader stage
@@ -296,7 +272,7 @@ impl Rasterizer {
                 let fragment_y = y - block.bounding_box.y() as usize;
                 let fragment_index = fragment_x + fragment_y * block.bounding_box.width() as usize;
                 let fragment = &block.fragments[fragment_index];
-                if fragment.face != Fragment::INVALID_FACE_INDEX {
+                if fragment.is_valid() {
                     let face = &processed_faces[fragment.face];
                     let interpolated = D::interpolate(
                         &face.vertex0_data,
@@ -310,8 +286,13 @@ impl Rasterizer {
                 }
             });
 
-        self.frame_time.time_fragment_shader = start.elapsed();
+        let fragment_shader_duration = start.elapsed();
 
+        self.frame_time = FrameTime::new(
+            vertex_shader_duration,
+            rasterization_duration,
+            fragment_shader_duration,
+        );
         self.frame_blocks = Some(frame_blocks);
     }
 
@@ -342,8 +323,8 @@ impl Rasterizer {
 
     fn is_face_in_screen<D>(&self, face: &ProcessedModelFace<D>) -> bool {
         self.is_point_in_screen(&face.vertex0)
-            && self.is_point_in_screen(&face.vertex1)
-            && self.is_point_in_screen(&face.vertex2)
+            || self.is_point_in_screen(&face.vertex1)
+            || self.is_point_in_screen(&face.vertex2)
     }
 
     //Checks if a point in normalized coordinates is inside the screen
@@ -394,9 +375,10 @@ impl Rasterizer {
             (bounding_box.y() + bounding_box.height()).min(self.height()) / Self::BLOCK_SIZE;
         let blocks_width = self.frame_blocks_width();
 
+        let block_count = self.frame_block_count;
         (top_block..=bot_block)
             .cartesian_product(left_block..=right_block)
-            .map(move |(y, x)| (x + y * blocks_width) as usize)
+            .map(move |(y, x)| ((x + y * blocks_width) as usize).min(block_count - 1))
     }
 }
 

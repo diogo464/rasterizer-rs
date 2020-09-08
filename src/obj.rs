@@ -32,6 +32,7 @@ fn read_obj_model<P: AsRef<Path>>(path: P) -> ObjModel {
         }
         let line = line.replace("  ", " ");
         let mut split = line.split(' ');
+        println!("{}", line);
         match split.next().unwrap() {
             "v" => {
                 let x = split.next().unwrap().parse::<f32>().unwrap();
@@ -76,10 +77,6 @@ fn read_obj_model<P: AsRef<Path>>(path: P) -> ObjModel {
                 } else {
                     None
                 };
-
-                let v0_index = vertices.len();
-                let v1_index = v0_index + 1;
-                let v2_index = v0_index + 2;
 
                 faces.push(ObjFace {
                     vertices: [v0, v1, v2],

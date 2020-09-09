@@ -12,6 +12,7 @@ impl Point {
         Self { x, y }
     }
 
+    #[allow(dead_code)]
     pub fn from_normalized(mut x: f32, mut y: f32, width: u32, height: u32) -> Self {
         x = (x + 1.0) / 2.0;
         y = (-y + 1.0) / 2.0;
@@ -22,6 +23,7 @@ impl Point {
         Point::new(x, y)
     }
 
+    #[allow(dead_code)]
     pub fn as_vec2(&self) -> Vec2 {
         Vec2::new(self.x as f32, self.y as f32)
     }

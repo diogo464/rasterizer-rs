@@ -251,6 +251,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "model_viewer"
+version = "0.1.0"
+dependencies = [
+ "image",
+ "itertools",
+ "nalgebra-glm",
+ "rasterizer",
+ "sdl2",
+]
+
+[[package]]
 name = "nalgebra"
 version = "0.22.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -446,10 +457,9 @@ dependencies = [
 ]
 
 [[package]]
-name = "raster"
+name = "rasterizer"
 version = "0.1.0"
 dependencies = [
- "image",
  "itertools",
  "nalgebra-glm",
  "rand",
@@ -500,6 +510,29 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d29ab0c6d3fc0ee92fe66e2d99f700eab17a8d57d1c1d3b748380fb20baa78cd"
 
 [[package]]
+name = "sdl2"
+version = "0.34.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "fcbb85f4211627a7291c83434d6bbfa723e28dcaa53c7606087e3c61929e4b9c"
+dependencies = [
+ "bitflags",
+ "lazy_static",
+ "libc",
+ "sdl2-sys",
+]
+
+[[package]]
+name = "sdl2-sys"
+version = "0.34.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3ed17d6d46b62b7df12134513bcc4f071268963e8c9bc8bf7ad983fbfb2bc3cc"
+dependencies = [
+ "cfg-if",
+ "libc",
+ "version-compare",
+]
+
+[[package]]
 name = "simba"
 version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -527,6 +560,12 @@ name = "typenum"
 version = "1.12.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "373c8a200f9e67a0c95e62a4f52fbf80c23b4381c05a17845531982fa99e6b33"
+
+[[package]]
+name = "version-compare"
+version = "0.0.10"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d63556a25bae6ea31b52e640d7c41d1ab27faba4ccb600013837a3d0b3994ca1"
 
 [[package]]
 name = "wasi"

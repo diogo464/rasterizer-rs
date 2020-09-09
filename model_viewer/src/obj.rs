@@ -1,5 +1,4 @@
-use crate::rasterizer::VertexData;
-pub use crate::rasterizer::{Model, ModelFace};
+use crate::model::{Model, ModelVertex};
 use glm::{Vec2, Vec3};
 use nalgebra_glm as glm;
 use std::path::Path;
@@ -100,7 +99,7 @@ pub fn read_model<P: AsRef<Path>>(path: P) -> Model {
     let obj = read_obj_model(path);
 
     let mut vertices = Vec::new();
-    let mut faces = Vec::new();
+    let mut indices = Vec::new();
 
     for face in obj.faces.iter() {
         let v0_pos = obj.vertices[face.vertices[0]];
@@ -119,28 +118,26 @@ pub fn read_model<P: AsRef<Path>>(path: P) -> Model {
         let v1_index = v0_index + 1;
         let v2_index = v0_index + 2;
 
-        vertices.push(VertexData {
+        vertices.push(ModelVertex {
             position: v0_pos,
             normal: v0_normal,
             texture: v0_texture,
         });
-        vertices.push(VertexData {
+        vertices.push(ModelVertex {
             position: v1_pos,
             normal: v1_normal,
             texture: v1_texture,
         });
-        vertices.push(VertexData {
+        vertices.push(ModelVertex {
             position: v2_pos,
             normal: v2_normal,
             texture: v2_texture,
         });
 
-        faces.push(ModelFace {
-            vertex_0: v0_index,
-            vertex_1: v1_index,
-            vertex_2: v2_index,
-        })
+        indices.push(v0_index);
+        indices.push(v1_index);
+        indices.push(v2_index);
     }
 
-    Model { vertices, faces }
+    Model { vertices, indices }
 }

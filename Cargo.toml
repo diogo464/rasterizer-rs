@@ -1,17 +1,9 @@
-[package]
-name = "raster"
-version = "0.1.0"
-authors = ["diogo <diogo464@protonmail.com>"]
-edition = "2018"
-
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
-[dependencies]
-nalgebra-glm = "0.8.0"
-itertools = "0.9.0"
-rand = "0.7"
-image = "0.23"
-rayon = "1.4"
+[workspace]
+members = ["rasterizer", "model_viewer"]
+
+
 
 [profile.release]
 debug = true

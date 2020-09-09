@@ -1,88 +1,23 @@
 #![feature(test)]
 #![feature(clamp)]
-#![feature(slice_fill)]
 
+pub mod model;
 pub mod obj;
-pub mod rasterizer;
+pub mod ppm;
+pub mod shaders;
+pub mod texture;
 
-use crate::rasterizer::Interpolate;
-use rasterizer::{Model, Shader, ShaderData, Texture, VertexData};
+use shaders::*;
+
 use sdl2::rect::Rect;
 
 use sdl2::event::Event;
 use sdl2::keyboard::Keycode;
-use sdl2::{
-    pixels::{Color, PixelFormatEnum},
-    render::TextureAccess,
-};
-use std::time::Duration;
+use sdl2::{pixels::PixelFormatEnum, render::TextureAccess};
 
-mod ppm;
-use glm::{Mat4, Vec2, Vec3, Vec4};
-use image::{DynamicImage, GenericImageView};
+use glm::{Mat4, Vec3};
 use nalgebra_glm as glm;
-use ppm::PPMImage;
-
-impl Texture for DynamicImage {
-    fn color(&self, u: f32, v: f32) -> Vec4 {
-        let x = (u * self.width() as f32) as u32;
-        let y = ((1.0 - v) * self.height() as f32) as u32;
-        let c = self.as_rgb8().unwrap();
-        let p = c.get_pixel(x, y);
-        Vec4::new(
-            p[0] as f32 / 255.0,
-            p[1] as f32 / 255.0,
-            p[2] as f32 / 255.0,
-            1.0,
-        )
-    }
-}
-
-struct TextureShaderData {
-    texture_coords: Vec2,
-    normal: Vec3,
-}
-impl ShaderData for TextureShaderData {}
-impl Interpolate for TextureShaderData {
-    fn interpolate(v0: &Self, v1: &Self, v2: &Self, r0: f32, r1: f32, r2: f32) -> Self {
-        Self {
-            texture_coords: v0.texture_coords * r0
-                + v1.texture_coords * r1
-                + v2.texture_coords * r2,
-            normal: Vec3::interpolate(&v0.normal, &v1.normal, &v2.normal, r0, r1, r2),
-        }
-    }
-}
-
-struct TextureShader {
-    projection: Mat4,
-    view: Mat4,
-    model: Mat4,
-    texture: DynamicImage,
-}
-
-impl Shader for TextureShader {
-    type Data = TextureShaderData;
-
-    fn vertex(&self, vertex: &VertexData) -> (Vec4, Self::Data) {
-        let position = Vec4::new(vertex.position.x, vertex.position.y, vertex.position.z, 1.0);
-        let glpos = self.projection * self.view * self.model * position;
-        let data = TextureShaderData {
-            texture_coords: vertex.texture.unwrap(),
-            normal: vertex.normal.unwrap(),
-        };
-        (glpos, data)
-    }
-
-    fn fragment(&self, data: &Self::Data) -> Vec4 {
-        let shade = (0.3 + data.normal.dot(&Vec3::new(0.5, 1.0, 0.5))).min(1.0);
-        <DynamicImage as Texture>::color(
-            &self.texture,
-            data.texture_coords.x,
-            data.texture_coords.y,
-        ) * shade
-    }
-}
+use rasterizer::VertexShader;
 
 struct ModelViewerState {
     sensitivity: f32,
@@ -187,21 +122,19 @@ impl ModelViewerState {
 }
 
 fn main() {
-    const WIDTH: u32 = 1920;
-    const HEIGHT: u32 = 1080;
+    const WIDTH: u32 = 800;
+    const HEIGHT: u32 = 600;
 
-    let model = obj::read_model("diablo3.obj");
-    let img = image::open("diablo3_pose_diffuse.tga").unwrap();
+    let model = obj::read_model("model_viewer/diablo3.obj");
+    let img = image::open("model_viewer/diablo3_pose_diffuse.tga").unwrap();
     let mut state = ModelViewerState::new();
 
     let model_mat = glm::translation(&Vec3::new(-0.1, -0.5, -0.45));
-    let projection = glm::perspective(16.0 / 9.0, 3.1415 / 2.0, 0.001, 100.0);
-    let mut shader = TextureShader {
-        projection,
-        view: state.generate_view_matrix(),
-        model: model_mat,
-        texture: img,
-    };
+    let mut uniform = ProjViewModel::default();
+
+    let vertex_shader = StandardVertexShader {};
+    let frag_shader = NormalShadingFragmentShader::new();
+    let frag_shader = FlatTextureFragmentShader::new(img);
 
     let mut rasterizer = rasterizer::Rasterizer::new(WIDTH, HEIGHT);
 
@@ -231,6 +164,7 @@ fn main() {
     let mut pixels: [u8; (4 * WIDTH * HEIGHT) as usize] = [0; (4 * WIDTH * HEIGHT) as usize];
     let mut event_pump = sdl_context.event_pump().unwrap();
     let mut timer = std::time::Instant::now();
+    let mut time = 0.0;
     'running: loop {
         let delta = timer.elapsed().as_secs_f32();
         timer = std::time::Instant::now();
@@ -250,9 +184,17 @@ fn main() {
 
         rasterizer.clear();
 
-        shader.view = state.generate_view_matrix();
-        shader.projection = state.generate_projection_matrix();
-        rasterizer.render_model(&model, &shader);
+        uniform.view = state.generate_view_matrix();
+        uniform.model = model_mat;
+        uniform.projection = state.generate_projection_matrix();
+        let vertex_shader = WeirdSinVertexShader { t: time };
+        rasterizer.render_model(
+            &model.vertices,
+            &model.indices,
+            &vertex_shader,
+            &frag_shader,
+            &uniform,
+        );
 
         rasterizer
             .framebuffer()
@@ -277,5 +219,6 @@ fn main() {
             rasterizer.frametime(),
             rasterizer.frametime().total()
         );
+        time += delta;
     }
 }

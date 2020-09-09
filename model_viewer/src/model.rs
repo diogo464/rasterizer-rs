@@ -2,13 +2,13 @@ use glm::{Vec2, Vec3};
 use nalgebra_glm as glm;
 
 #[derive(Debug)]
-pub struct VertexData {
+pub struct ModelVertex {
     pub position: Vec3,
     pub texture: Option<Vec2>,
     pub normal: Option<Vec3>,
 }
 
-impl VertexData {
+impl ModelVertex {
     pub fn new(position: Vec3, texture: Vec2, normal: Vec3) -> Self {
         Self {
             position,
@@ -24,4 +24,17 @@ impl VertexData {
             normal: None,
         }
     }
+}
+
+#[derive(Debug)]
+#[allow(dead_code)]
+struct ModelFace {
+    pub vertex_0: usize,
+    pub vertex_1: usize,
+    pub vertex_2: usize,
+}
+
+pub struct Model {
+    pub vertices: Vec<ModelVertex>,
+    pub indices: Vec<usize>,
 }

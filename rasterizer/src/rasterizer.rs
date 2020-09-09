@@ -1,19 +1,15 @@
 mod bounding_box;
 mod framebuffer;
 mod frametime;
-mod model;
 mod point;
 mod shader;
-mod vertex_data;
 
 use bounding_box::BoundingBox;
-use point::Point;
 
 pub use framebuffer::Framebuffer;
 pub use frametime::FrameTime;
-pub use model::{Model, ModelFace};
-pub use shader::{Interpolate, Shader, ShaderData, Texture};
-pub use vertex_data::VertexData;
+pub use shader::{FragmentShader, Interpolate, Shader, ShaderData, VertexShader};
+//pub use vertex_data::VertexData;
 
 use glm::{Vec2, Vec3};
 use itertools::Itertools;
@@ -159,10 +155,19 @@ impl Rasterizer {
         }
     }
 
-    pub fn render_model<S, D>(&mut self, model: &Model, program: &S)
-    where
-        D: ShaderData,
-        S: Shader<Data = D>,
+    pub fn render_model<VS, FS, SD, V, U>(
+        &mut self,
+        vertices: &[V],
+        indices: &[usize],
+        vertex_shader: &VS,
+        fragment_shader: &FS,
+        uniform: &U,
+    ) where
+        V: Send + Sync,
+        U: Send + Sync,
+        SD: ShaderData,
+        VS: VertexShader<VertexData = V, Uniform = U, SharedData = SD>,
+        FS: FragmentShader<Uniform = U, SharedData = SD>,
     {
         //Need to do this because of ownership
         let mut frame_blocks = self.frame_blocks.take().unwrap();
@@ -170,14 +175,18 @@ impl Rasterizer {
 
         let start = std::time::Instant::now();
         //Vertex shader stage
-        model
-            .faces
-            .par_iter()
-            .map(|face| {
-                let (v0, v1, v2) = model.get_face_vertices(face);
-                let (vertex0, vertex0_data) = program.vertex(v0);
-                let (vertex1, vertex1_data) = program.vertex(v1);
-                let (vertex2, vertex2_data) = program.vertex(v2);
+        (0..indices.len() / 3)
+            .into_par_iter()
+            .map(|triangle_index| {
+                let base_index = triangle_index * 3;
+                let (v0, v1, v2) = (
+                    &vertices[base_index],
+                    &vertices[base_index + 1],
+                    &vertices[base_index + 2],
+                );
+                let (vertex0, vertex0_data) = vertex_shader.vertex(v0, &uniform);
+                let (vertex1, vertex1_data) = vertex_shader.vertex(v1, &uniform);
+                let (vertex2, vertex2_data) = vertex_shader.vertex(v2, &uniform);
                 let vertex0 = vertex0.xyz() / vertex0[3];
                 let vertex1 = vertex1.xyz() / vertex1[3];
                 let vertex2 = vertex2.xyz() / vertex2[3];
@@ -274,7 +283,7 @@ impl Rasterizer {
                 let fragment = &block.fragments[fragment_index];
                 if fragment.is_valid() {
                     let face = &processed_faces[fragment.face];
-                    let interpolated = D::interpolate(
+                    let interpolated = SD::interpolate(
                         &face.vertex0_data,
                         &face.vertex1_data,
                         &face.vertex2_data,
@@ -282,7 +291,7 @@ impl Rasterizer {
                         fragment.vertex1_ratio,
                         fragment.vertex2_ratio,
                     );
-                    *color = program.fragment(&interpolated).xyz();
+                    *color = fragment_shader.fragment(&interpolated, &uniform).xyz();
                 }
             });
 

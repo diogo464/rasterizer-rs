@@ -24,32 +24,16 @@ impl BoundingBox {
         self.h
     }
     pub fn overlap(&self, other: &BoundingBox) -> Option<BoundingBox> {
-        let (minl, maxl) = if self.x <= other.x {
-            (self.x, other.x)
-        } else {
-            (other.x, self.x)
-        };
-        let (minr, maxr) = if (self.x + self.w) <= (other.x + other.w) {
-            (self.x + self.w, other.x + other.w)
-        } else {
-            (other.x + other.w, self.x + self.w)
-        };
+        let maxl = self.x.max(other.x);
+        let minr = (self.x + self.w).min(other.x + other.w);
 
         if minr < maxl {
             return None;
         }
 
-        let (mint, maxt) = if self.y <= other.y {
-            (self.y, other.y)
-        } else {
-            (other.y, self.y)
-        };
-        let (minb, maxb) = if (self.y + self.h) <= (other.y + other.h) {
-            (self.y + self.h, other.y + other.h)
-        } else {
-            (other.y + other.h, self.y + self.h)
-        };
-
+        let maxt = self.y.max(other.y);
+        let minb= (self.y + self.h).min(other.y + other.h);
+        
         if maxt > minb {
             return None;
         }

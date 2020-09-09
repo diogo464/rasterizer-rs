@@ -1,4 +1,4 @@
-use super::vertex_data::VertexData;
+//use super::vertex_data::VertexData;
 use glm::{Vec2, Vec3, Vec4};
 use nalgebra_glm as glm;
 
@@ -8,13 +8,29 @@ pub trait Interpolate {
 pub trait ShaderData: Interpolate + Send + Sync {}
 
 pub trait Shader: Send + Sync {
+    type VertexData: Send + Sync;
     type Data: ShaderData;
-    fn vertex(&self, vertex: &VertexData) -> (Vec4, Self::Data);
+    fn vertex(&self, vertex: &Self::VertexData) -> (Vec4, Self::Data);
     fn fragment(&self, data: &Self::Data) -> Vec4;
 }
 
-pub trait Texture {
-    fn color(&self, u: f32, v: f32) -> Vec4;
+pub trait VertexShader: Send + Sync {
+    type VertexData: Send + Sync;
+    type Uniform: Send + Sync;
+    type SharedData: ShaderData;
+
+    fn vertex(
+        &self,
+        vertex: &Self::VertexData,
+        uniform: &Self::Uniform,
+    ) -> (Vec4, Self::SharedData);
+}
+
+pub trait FragmentShader: Send + Sync {
+    type Uniform: Send + Sync;
+    type SharedData: ShaderData;
+
+    fn fragment(&self, shared: &Self::SharedData, uniform: &Self::Uniform) -> Vec4;
 }
 
 macro_rules! impl_interpolate {

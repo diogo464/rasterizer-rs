@@ -134,7 +134,25 @@ fn main() {
 
     let vertex_shader = StandardVertexShader {};
     let frag_shader = NormalShadingFragmentShader::new();
-    let frag_shader = FlatTextureFragmentShader::new(img);
+    //let frag_shader = FlatTextureFragmentShader::new(img);
+
+    let vertex_shader = PhongVertexShader {};
+    let frag_shader = PhongFragmentShader {};
+
+    let mut light_pos = Vec3::new(2.0, 2.0, 2.0);
+    let mut light_intensity = 0.5;
+    let mut light_color = Vec3::new(1.0, 1.0, 1.0);
+
+    let mut uniform = PhongUniform {
+        pvm: ProjViewModel::default(),
+        light_pos,
+        light_color,
+        light_intensity,
+        ambient_color: Vec3::new(1.0, 1.0, 1.0),
+        ambient_intensity: 0.2,
+        viewpos: Vec3::new(0.0, 0.0, 0.0),
+        texture: img,
+    };
 
     let mut rasterizer = rasterizer::Rasterizer::new(WIDTH, HEIGHT);
 
@@ -178,16 +196,20 @@ fn main() {
                     keycode: Some(Keycode::Escape),
                     ..
                 } => break 'running,
+                Event::MouseButtonDown { .. } => {
+                    light_pos = state.position;
+                }
                 _ => {}
             }
         }
 
         rasterizer.clear();
 
-        uniform.view = state.generate_view_matrix();
-        uniform.model = model_mat;
-        uniform.projection = state.generate_projection_matrix();
-        let vertex_shader = WeirdSinVertexShader { t: time };
+        uniform.pvm.view = state.generate_view_matrix();
+        uniform.pvm.model = model_mat;
+        uniform.pvm.projection = state.generate_projection_matrix();
+        uniform.viewpos = state.position;
+        uniform.light_pos = light_pos;
         rasterizer.render_model(
             &model.vertices,
             &model.indices,

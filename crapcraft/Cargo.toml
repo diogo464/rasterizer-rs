@@ -1,5 +1,5 @@
 [package]
-name = "rasterizer"
+name = "crapcraft"
 version = "0.1.0"
 authors = ["diogo <diogo464@protonmail.com>"]
 edition = "2018"
@@ -7,8 +7,8 @@ edition = "2018"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-nalgebra-glm = "0.8.0"
-itertools = "0.9.0"
+rasterizer = { path = "../rasterizer" }
+sdl2 = "0.34"
+image = "0.23"
 rand = "0.7"
-rayon = "1.4"
-rasterizer-macros = { path = "../rasterizer-macros" }
+nalgebra-glm = "0.8.0"

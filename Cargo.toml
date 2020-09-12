@@ -1,9 +1,7 @@
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [workspace]
-members = ["rasterizer", "model_viewer"]
+members = ["rasterizer", "rasterizer-macros", "model_viewer", "crapcraft"]
 
 
 
-[profile.release]
-debug = true

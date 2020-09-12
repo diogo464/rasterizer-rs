@@ -6,6 +6,7 @@ pub trait Interpolate {
     fn interpolate(v0: &Self, v1: &Self, v2: &Self, r0: f32, r1: f32, r2: f32) -> Self;
 }
 pub trait ShaderData: Interpolate + Send + Sync {}
+impl<T: Interpolate + Send + Sync> ShaderData for T {}
 
 pub trait Shader: Send + Sync {
     type VertexData: Send + Sync;

@@ -20,26 +20,11 @@ pub struct ProjViewModel {
     pub model: Mat4,
 }
 
+#[derive(Interpolate)]
 pub struct StandardShaderData {
     texture_coords: Vec2,
     normal: Vec3,
 }
-impl Interpolate for StandardShaderData {
-    fn interpolate(v0: &Self, v1: &Self, v2: &Self, r0: f32, r1: f32, r2: f32) -> Self {
-        Self {
-            texture_coords: Vec2::interpolate(
-                &v0.texture_coords,
-                &v1.texture_coords,
-                &v2.texture_coords,
-                r0,
-                r1,
-                r2,
-            ),
-            normal: Vec3::interpolate(&v0.normal, &v1.normal, &v2.normal, r0, r1, r2),
-        }
-    }
-}
-impl ShaderData for StandardShaderData {}
 
 pub struct StandardVertexShader {}
 impl VertexShader for StandardVertexShader {
@@ -126,7 +111,7 @@ impl VertexShader for WeirdSinVertexShader {
     }
 }
 
-pub struct PhongUniform {
+pub struct D3Uniform {
     pub pvm: ProjViewModel,
     pub light_pos: Vec3,
     pub light_color: Vec3,
@@ -134,44 +119,24 @@ pub struct PhongUniform {
     pub ambient_color: Vec3,
     pub ambient_intensity: f32,
     pub viewpos: Vec3,
-    pub texture: DynamicImage,
+    pub diffuse: DynamicImage,
+    pub specular: DynamicImage,
+    pub normals: DynamicImage,
+    pub glow: DynamicImage,
 }
 
-pub struct PhongShareData {
+#[derive(Interpolate)]
+pub struct D3ShareData {
     texture_coords: Vec2,
     normal: Vec3,
     vertex_pos: Vec3,
 }
-impl Interpolate for PhongShareData {
-    fn interpolate(v0: &Self, v1: &Self, v2: &Self, r0: f32, r1: f32, r2: f32) -> Self {
-        Self {
-            texture_coords: Vec2::interpolate(
-                &v0.texture_coords,
-                &v1.texture_coords,
-                &v2.texture_coords,
-                r0,
-                r1,
-                r2,
-            ),
-            normal: Vec3::interpolate(&v0.normal, &v1.normal, &v2.normal, r0, r1, r2),
-            vertex_pos: Vec3::interpolate(
-                &v0.vertex_pos,
-                &v1.vertex_pos,
-                &v2.vertex_pos,
-                r0,
-                r1,
-                r2,
-            ),
-        }
-    }
-}
-impl ShaderData for PhongShareData {}
 
-pub struct PhongVertexShader {}
-impl VertexShader for PhongVertexShader {
+pub struct D3VertexShader {}
+impl VertexShader for D3VertexShader {
     type VertexData = ModelVertex;
-    type Uniform = PhongUniform;
-    type SharedData = PhongShareData;
+    type Uniform = D3Uniform;
+    type SharedData = D3ShareData;
 
     fn vertex(
         &self,
@@ -190,31 +155,38 @@ impl VertexShader for PhongVertexShader {
     }
 }
 
-pub struct PhongFragmentShader {}
-impl FragmentShader for PhongFragmentShader {
-    type Uniform = PhongUniform;
-    type SharedData = PhongShareData;
+pub struct D3FragmentShader {}
+impl FragmentShader for D3FragmentShader {
+    type Uniform = D3Uniform;
+    type SharedData = D3ShareData;
 
     fn fragment(&self, shared: &Self::SharedData, uniform: &Self::Uniform) -> Vec4 {
         let vertex_to_light = glm::normalize(&(uniform.light_pos - shared.vertex_pos));
         let vertex_to_view = glm::normalize(&(uniform.viewpos - shared.vertex_pos));
+        let tc = &shared.texture_coords;
 
+        let glow = uniform.glow.color_at(tc.x, tc.y);
+        let normal = uniform.normals.color_at(tc.x, tc.y).xyz().normalize();
         let ambient = uniform.ambient_color * uniform.ambient_intensity;
-        let diffuse = glm::dot(&vertex_to_light, &shared.normal).max(0.0)
+        let diffuse = glm::dot(&vertex_to_light, &normal).max(0.0)
             * uniform.light_color
             * uniform.light_intensity;
-        let specular = glm::dot(&reflect(&vertex_to_light, &shared.normal), &vertex_to_view)
+        let specular = glm::matrix_comp_mult(
+            &uniform
+                .specular
+                .color_at(shared.texture_coords.x, shared.texture_coords.y)
+                .xyz(),
+            &uniform.light_color,
+        ) * glm::dot(&reflect(&vertex_to_light, &normal), &vertex_to_view)
             .max(0.0)
             .powf(32.0)
-            * uniform.light_color
-            * 1.3
-            * uniform.light_intensity;
+            * 32.0;
         let light = ambient + diffuse + specular;
 
         let color = uniform
-            .texture
+            .diffuse
             .color_at(shared.texture_coords.x, shared.texture_coords.y);
-        let final_color = Vec4::new(light.x, light.y, light.z, 1.0).component_mul(&color);
+        let final_color = Vec4::new(light.x, light.y, light.z, 1.0).component_mul(&color) + glow;
         final_color
     }
 }

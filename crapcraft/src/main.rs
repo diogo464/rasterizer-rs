@@ -1,23 +1,16 @@
-#![feature(test)]
 #![feature(clamp)]
+pub mod crapcraft;
 
-pub mod model;
-pub mod obj;
-pub mod ppm;
-pub mod shaders;
-pub mod texture;
-
-use shaders::*;
-
-use sdl2::rect::Rect;
-
+use crapcraft::block::Block;
+use rand::RngCore;
+use rasterizer::Rasterizer;
 use sdl2::event::Event;
 use sdl2::keyboard::Keycode;
+use sdl2::rect::Rect;
 use sdl2::{pixels::PixelFormatEnum, render::TextureAccess};
 
 use glm::{Mat4, Vec3};
 use nalgebra_glm as glm;
-use rasterizer::VertexShader;
 
 struct ModelViewerState {
     sensitivity: f32,
@@ -36,7 +29,7 @@ impl ModelViewerState {
     fn new() -> Self {
         Self {
             sensitivity: 0.01,
-            camera_speed: 1.0,
+            camera_speed: 4.0,
             fov: 90.0,
             position: Vec3::new(0.0, 0.0, 2.0),
             velocity: Vec3::new(0.0, 0.0, 0.0),
@@ -66,6 +59,7 @@ impl ModelViewerState {
                     Keycode::A => self.velocity.x -= 1.0,
                     Keycode::D => self.velocity.x += 1.0,
                     Keycode::Space => self.velocity.y += 1.0,
+                    Keycode::LShift => self.camera_speed *= 4.0,
                     _ => {}
                 };
             }
@@ -81,6 +75,7 @@ impl ModelViewerState {
                     Keycode::A => self.velocity.x += 1.0,
                     Keycode::D => self.velocity.x -= 1.0,
                     Keycode::Space => self.velocity.y -= 1.0,
+                    Keycode::LShift => self.camera_speed /= 4.0,
                     _ => {}
                 };
             }
@@ -101,7 +96,7 @@ impl ModelViewerState {
     }
 
     fn generate_projection_matrix(&self) -> Mat4 {
-        glm::perspective(16.0 / 9.0, self.fov.to_radians(), 0.001, 100.0)
+        glm::perspective(800.0 / 600.0, self.fov.to_radians(), 0.00001, 100.0)
     }
 
     fn generate_view_matrix(&self) -> Mat4 {
@@ -121,47 +116,49 @@ impl ModelViewerState {
     }
 }
 
+struct Game {
+    chunk: crapcraft::chunk::Chunk,
+    mesh: crapcraft::chunk::ChunkMesh,
+}
+
+impl Game {
+    fn new() -> Self {
+        let mut chunk = crapcraft::chunk::Chunk::filled(Block::Dirt);
+        // chunk.blocks_mut().iter_mut().for_each(|b| {
+        //     let mut rng = rand::thread_rng();
+        //     if rng.next_u32() >= u32::MAX / 2 {
+        //         *b = Block::Air;
+        //     }
+        // });
+        let mesh = chunk.generate_mesh();
+        println!("Vertex count : {}", mesh.vertices.len());
+        Self { chunk, mesh }
+    }
+
+    fn draw(&self, renderer: &mut Rasterizer, state: &ModelViewerState) {
+        let vshader = crapcraft::shaders::ChunkVertexShader::default();
+        let fshader = crapcraft::shaders::ChunkFragmentShader::default();
+        let model = glm::translation(&Vec3::new(0.0, 0.0, -1.0));
+        let uniform = crapcraft::shaders::ProjViewModel::new(
+            &state.generate_projection_matrix(),
+            &state.generate_view_matrix(),
+            &model,
+        );
+        renderer.render_model(
+            &self.mesh.vertices,
+            &self.mesh.indices,
+            &vshader,
+            &fshader,
+            &uniform,
+        );
+    }
+}
+
 fn main() {
     const WIDTH: u32 = 1920;
     const HEIGHT: u32 = 1080;
 
-    let model = obj::read_model("model_viewer/diablo3.obj");
-
     let mut state = ModelViewerState::new();
-
-    let model_mat = glm::translation(&Vec3::new(-0.1, -0.5, -0.45));
-    let mut uniform = ProjViewModel::default();
-
-    let vertex_shader = StandardVertexShader {};
-    let frag_shader = NormalShadingFragmentShader::new();
-    //let frag_shader = FlatTextureFragmentShader::new(img);
-
-    let vertex_shader = D3VertexShader {};
-    let frag_shader = D3FragmentShader {};
-
-    let mut light_pos = Vec3::new(2.0, 2.0, 2.0);
-    let mut light_intensity = 0.7;
-    let mut light_color = Vec3::new(1.0, 1.0, 1.0);
-
-    let diffuse = image::open("model_viewer/diablo3_pose_diffuse.tga").unwrap();
-    let specular = image::open("model_viewer/diablo3_pose_spec.tga").unwrap();
-    let normals = image::open("model_viewer/diablo3_pose_nm.tga").unwrap();
-    let glow = image::open("model_viewer/diablo3_pose_glow.tga").unwrap();
-
-    let mut uniform = D3Uniform {
-        pvm: ProjViewModel::default(),
-        light_pos,
-        light_color,
-        light_intensity,
-        ambient_color: Vec3::new(1.0, 1.0, 1.0),
-        ambient_intensity: 0.1,
-        viewpos: Vec3::new(0.0, 0.0, 0.0),
-        diffuse,
-        specular,
-        normals,
-        glow,
-    };
-
     let mut rasterizer = rasterizer::Rasterizer::new(WIDTH, HEIGHT);
 
     let sdl_context = sdl2::init().unwrap();
@@ -187,10 +184,11 @@ fn main() {
         )
         .expect("Failed to create texture");
 
+    let mut game = Game::new();
+
     let mut pixels: [u8; (4 * WIDTH * HEIGHT) as usize] = [0; (4 * WIDTH * HEIGHT) as usize];
     let mut event_pump = sdl_context.event_pump().unwrap();
     let mut timer = std::time::Instant::now();
-    let mut time = 0.0;
     'running: loop {
         let delta = timer.elapsed().as_secs_f32();
         timer = std::time::Instant::now();
@@ -204,28 +202,12 @@ fn main() {
                     keycode: Some(Keycode::Escape),
                     ..
                 } => break 'running,
-                Event::MouseButtonDown { .. } => {
-                    light_pos = state.position;
-                }
                 _ => {}
             }
         }
 
         rasterizer.clear();
-
-        uniform.pvm.view = state.generate_view_matrix();
-        uniform.pvm.model = model_mat;
-        uniform.pvm.projection = state.generate_projection_matrix();
-        uniform.viewpos = state.position;
-        uniform.light_pos = light_pos;
-        rasterizer.render_model(
-            &model.vertices,
-            &model.indices,
-            &vertex_shader,
-            &frag_shader,
-            &uniform,
-        );
-
+        game.draw(&mut rasterizer, &state);
         rasterizer
             .framebuffer()
             .color()
@@ -249,6 +231,5 @@ fn main() {
             rasterizer.frametime(),
             rasterizer.frametime().total()
         );
-        time += delta;
     }
 }

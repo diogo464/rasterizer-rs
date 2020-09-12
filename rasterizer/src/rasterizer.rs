@@ -132,7 +132,7 @@ pub struct Rasterizer {
 impl Rasterizer {
     const NORMALIZED_COORDS_MIN: f32 = -1.0;
     const NORMALIZED_COORDS_MAX: f32 = 1.0;
-    const BLOCK_SIZE: u32 = 128;
+    const BLOCK_SIZE: u32 = 64;
 
     pub fn new(width: u32, height: u32) -> Self {
         let framebuffer = Framebuffer::new(width, height);
@@ -318,12 +318,16 @@ impl Rasterizer {
     }
 
     pub fn clear(&mut self) {
+        self.clear_color(Vec3::new(0.0, 0.0, 0.0))
+    }
+
+    pub fn clear_color(&mut self, color: Vec3) {
         self.frame_blocks
             .as_mut()
             .unwrap()
             .par_iter_mut()
             .for_each(|b| b.clear());
-        self.framebuffer.color.fill(Vec3::new(1.0, 1.0, 1.0));
+        self.framebuffer.color.fill(color);
     }
 
     pub fn frametime(&self) -> &FrameTime {

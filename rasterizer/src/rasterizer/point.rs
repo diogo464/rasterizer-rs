@@ -1,5 +1,4 @@
-use glm::Vec2;
-use nalgebra_glm as glm;
+use crate::math_prelude::*;
 
 #[derive(Debug)]
 pub struct Point {

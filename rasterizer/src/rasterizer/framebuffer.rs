@@ -1,5 +1,4 @@
-use glm::Vec3;
-use nalgebra_glm as glm;
+use crate::math_prelude::*;
 
 pub struct Framebuffer {
     pub(super) width: u32,
@@ -37,20 +36,20 @@ impl Framebuffer {
         })
     }
 
-    pub fn color(&self) -> impl Iterator<Item = (u32, u32, &Vec3)> {
+    pub fn color(&self) -> impl Iterator<Item = (u32, u32, Vec3)> + '_ {
         self.color.iter().enumerate().map(move |(i, c)| {
             let (x, y) = self.index_to_coords(i as u32);
-            (x, y, c)
+            (x, y, *c)
         })
     }
 
-    pub fn get_color(&self, x: u32, y: u32) -> Option<&Vec3> {
-        self.color.get(self.coords_to_index(x, y) as usize)
+    pub fn get_color(&self, x: u32, y: u32) -> Option<Vec3> {
+        self.color.get(self.coords_to_index(x, y) as usize).copied()
     }
 
-    pub fn set_color(&mut self, x: u32, y: u32, color: &Vec3) {
+    pub fn set_color(&mut self, x: u32, y: u32, color: Vec3) {
         let index = self.coords_to_index(x, y) as usize;
-        self.color[index] = *color;
+        self.color[index] = color;
     }
 
     fn coords_to_index(&self, x: u32, y: u32) -> u32 {

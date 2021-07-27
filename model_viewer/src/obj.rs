@@ -1,7 +1,8 @@
-use crate::model::{Model, ModelVertex};
-use glm::{Vec2, Vec3};
-use nalgebra_glm as glm;
 use std::path::Path;
+
+use rasterizer::math_prelude::*;
+
+use crate::model::{Model, ModelVertex};
 
 struct ObjModel {
     vertices: Vec<Vec3>,

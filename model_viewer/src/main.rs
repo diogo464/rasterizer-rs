@@ -1,5 +1,4 @@
 #![feature(test)]
-#![feature(clamp)]
 
 pub mod model;
 pub mod obj;
@@ -7,17 +6,13 @@ pub mod ppm;
 pub mod shaders;
 pub mod texture;
 
-use shaders::*;
-
-use sdl2::rect::Rect;
-
+use rasterizer::math_prelude::*;
 use sdl2::event::Event;
 use sdl2::keyboard::Keycode;
+use sdl2::rect::Rect;
 use sdl2::{pixels::PixelFormatEnum, render::TextureAccess};
 
-use glm::{Mat4, Vec3};
-use nalgebra_glm as glm;
-use rasterizer::VertexShader;
+use shaders::*;
 
 struct ModelViewerState {
     sensitivity: f32,
@@ -93,24 +88,20 @@ impl ModelViewerState {
 
     fn update(&mut self, delta: f32) {
         let fwd = self.calculate_forward();
-        let right = fwd.cross(&Vec3::new(0.0, 1.0, 0.0)).normalize();
-        let up = right.cross(&fwd).normalize();
+        let right = fwd.cross(Vec3::new(0.0, 1.0, 0.0)).normalize();
+        let up = right.cross(fwd).normalize();
         self.position += (self.velocity.z * fwd + self.velocity.x * right + self.velocity.y * up)
             * delta
             * self.camera_speed;
     }
 
     fn generate_projection_matrix(&self) -> Mat4 {
-        glm::perspective(16.0 / 9.0, self.fov.to_radians(), 0.001, 100.0)
+        Mat4::perspective_rh(self.fov.to_radians(), 16.0 / 9.0, 0.001, 100.0)
     }
 
     fn generate_view_matrix(&self) -> Mat4 {
         let fwd = self.calculate_forward();
-        glm::look_at(
-            &self.position,
-            &(self.position + fwd),
-            &Vec3::new(0.0, 1.0, 0.0),
-        )
+        Mat4::look_at_rh(self.position, self.position + fwd, Vec3::Y)
     }
 
     fn calculate_forward(&self) -> Vec3 {
@@ -129,7 +120,7 @@ fn main() {
 
     let mut state = ModelViewerState::new();
 
-    let model_mat = glm::translation(&Vec3::new(-0.1, -0.5, -0.45));
+    let model_mat = Mat4::from_translation(Vec3::new(-0.1, -0.5, -0.45));
     let mut uniform = ProjViewModel::default();
 
     let vertex_shader = StandardVertexShader {};

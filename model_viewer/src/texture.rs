@@ -1,6 +1,5 @@
-use glm::Vec4;
 use image::{DynamicImage, GenericImageView};
-use nalgebra_glm as glm;
+use rasterizer::math_prelude::*;
 
 pub trait Texture {
     fn color_at(&self, u: f32, v: f32) -> Vec4;

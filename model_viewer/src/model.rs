@@ -1,5 +1,4 @@
-use glm::{Vec2, Vec3};
-use nalgebra_glm as glm;
+use rasterizer::math_prelude::*;
 
 #[derive(Debug)]
 pub struct ModelVertex {

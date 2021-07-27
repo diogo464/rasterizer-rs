@@ -4,17 +4,15 @@ mod frametime;
 mod point;
 mod shader;
 
+use itertools::Itertools;
+use rayon::prelude::*;
+
+use crate::math_prelude::*;
 use bounding_box::BoundingBox;
 
 pub use framebuffer::Framebuffer;
 pub use frametime::FrameTime;
 pub use shader::{FragmentShader, Interpolate, Shader, ShaderData, VertexShader};
-//pub use vertex_data::VertexData;
-
-use glm::{Vec2, Vec3};
-use itertools::Itertools;
-use nalgebra_glm as glm;
-use rayon::prelude::*;
 
 #[derive(Debug, Clone)]
 struct Fragment {
@@ -84,20 +82,20 @@ struct TriangleInteriorChecker {
 }
 
 impl TriangleInteriorChecker {
-    fn new(v0: &Vec3, v1: &Vec3, v2: &Vec3) -> Self {
+    fn new(v0: Vec3, v1: Vec3, v2: Vec3) -> Self {
         let col1 = v1 - v0;
         let col2 = v2 - v0;
         let inv_det = 1.0 / (col1.x * col2.y - col2.x * col1.y);
         let inv_col1 = Vec2::new(col2.y, -col1.y) * inv_det;
         let inv_col2 = Vec2::new(-col2.x, col1.x) * inv_det;
         Self {
-            vertex0: *v0,
+            vertex0: v0,
             inv_col1,
             inv_col2,
         }
     }
 
-    fn to_triangle_coords(&self, point: &Vec2) -> Vec2 {
+    fn to_triangle_coords(&self, point: Vec2) -> Vec2 {
         let (target_x, target_y) = { (point.x - self.vertex0.x, point.y - self.vertex0.y) };
         let newbase_x = self.inv_col1.x * target_x + self.inv_col2.x * target_y;
         let newbase_y = self.inv_col1.y * target_x + self.inv_col2.y * target_y;
@@ -105,7 +103,7 @@ impl TriangleInteriorChecker {
     }
 
     //A point in triangle coords
-    fn is_point_in_triangle(&self, triangle_point: &Vec2) -> bool {
+    fn is_point_in_triangle(&self, triangle_point: Vec2) -> bool {
         0.0 <= triangle_point.x
             && 0.0 <= triangle_point.y
             && (triangle_point.x + triangle_point.y) <= 1.0
@@ -190,7 +188,7 @@ impl Rasterizer {
                 let vertex0 = vertex0.xyz() / vertex0[3];
                 let vertex1 = vertex1.xyz() / vertex1[3];
                 let vertex2 = vertex2.xyz() / vertex2[3];
-                let bb = self.bounding_box_from_vertices(&vertex0, &vertex1, &vertex2);
+                let bb = self.bounding_box_from_vertices(vertex0, vertex1, vertex2);
                 ProcessedModelFace {
                     vertex0,
                     vertex0_data,
@@ -224,16 +222,15 @@ impl Rasterizer {
             {
                 if let Some(rasterize_box) = block.bounding_box.overlap(&face.bounding_box) {
                     let triangle_checker =
-                        TriangleInteriorChecker::new(&face.vertex0, &face.vertex1, &face.vertex2);
+                        TriangleInteriorChecker::new(face.vertex0, face.vertex1, face.vertex2);
 
                     let y_iter = rasterize_box.y()..(rasterize_box.y() + rasterize_box.height());
                     let x_iter = rasterize_box.x()..(rasterize_box.x() + rasterize_box.width());
 
                     for (y, x) in y_iter.cartesian_product(x_iter) {
                         let (nx, ny) = screen_to_normalized(x, y, self.width(), self.height());
-                        let triangle_point =
-                            triangle_checker.to_triangle_coords(&Vec2::new(nx, ny));
-                        if triangle_checker.is_point_in_triangle(&triangle_point) {
+                        let triangle_point = triangle_checker.to_triangle_coords(Vec2::new(nx, ny));
+                        if triangle_checker.is_point_in_triangle(triangle_point) {
                             let ratio_2 = triangle_point.y;
                             let ratio_1 = triangle_point.x;
                             let ratio_0 = 1.0 - ratio_1 - ratio_2;
@@ -335,13 +332,13 @@ impl Rasterizer {
     }
 
     fn is_face_in_screen<D>(&self, face: &ProcessedModelFace<D>) -> bool {
-        self.is_point_in_screen(&face.vertex0)
-            || self.is_point_in_screen(&face.vertex1)
-            || self.is_point_in_screen(&face.vertex2)
+        self.is_point_in_screen(face.vertex0)
+            || self.is_point_in_screen(face.vertex1)
+            || self.is_point_in_screen(face.vertex2)
     }
 
     //Checks if a point in normalized coordinates is inside the screen
-    fn is_point_in_screen(&self, point: &Vec3) -> bool {
+    fn is_point_in_screen(&self, point: Vec3) -> bool {
         let inrange = |l, h, v| v >= l && v <= h;
         inrange(
             Self::NORMALIZED_COORDS_MIN,
@@ -358,7 +355,7 @@ impl Rasterizer {
         )
     }
 
-    fn bounding_box_from_vertices(&self, v0: &Vec3, v1: &Vec3, v2: &Vec3) -> BoundingBox {
+    fn bounding_box_from_vertices(&self, v0: Vec3, v1: Vec3, v2: Vec3) -> BoundingBox {
         let min_x = v0.x.min(v1.x.min(v2.x));
         let min_y = v0.y.min(v1.y.min(v2.y));
         let max_x = v0.x.max(v1.x.max(v2.x));

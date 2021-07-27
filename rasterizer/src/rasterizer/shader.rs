@@ -1,10 +1,9 @@
-//use super::vertex_data::VertexData;
-use glm::{Vec2, Vec3, Vec4};
-use nalgebra_glm as glm;
+use crate::math_prelude::*;
 
 pub trait Interpolate {
     fn interpolate(v0: &Self, v1: &Self, v2: &Self, r0: f32, r1: f32, r2: f32) -> Self;
 }
+
 pub trait ShaderData: Interpolate + Send + Sync {}
 impl<T: Interpolate + Send + Sync> ShaderData for T {}
 
@@ -38,7 +37,7 @@ macro_rules! impl_interpolate {
     ($ty:ident) => {
         impl Interpolate for $ty {
             fn interpolate(v0: &Self, v1: &Self, v2: &Self, r0: f32, r1: f32, r2: f32) -> Self {
-                v0 * r0 + v1 * r1 + v2 * r2
+                *v0 * r0 + *v1 * r1 + *v2 * r2
             }
         }
     };

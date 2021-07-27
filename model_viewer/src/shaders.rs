@@ -1,14 +1,13 @@
 use crate::{model::ModelVertex, texture::Texture};
-use glm::{Mat4, Vec2, Vec3, Vec4};
 use image::DynamicImage;
-use nalgebra_glm as glm;
+use rasterizer::math_prelude::*;
 use rasterizer::{FragmentShader, Interpolate, ShaderData, VertexShader};
 
-fn reflect(dir: &Vec3, normal: &Vec3) -> Vec3 {
-    let nlen = normal.dot(&dir);
-    let normal_portion = *normal * nlen;
+fn reflect(dir: Vec3, normal: Vec3) -> Vec3 {
+    let nlen = normal.dot(dir);
+    let normal_portion = normal * nlen;
     //let offset = *dir - normal_portion;
-    normal_portion * 2.0 - *dir
+    normal_portion * 2.0 - dir
     //offset - normal_portion
     //normal_portion - offset | normal_portion - *dir + normal_portion
 }
@@ -59,7 +58,7 @@ impl FragmentShader for FlatTextureFragmentShader {
     type SharedData = StandardShaderData;
 
     fn fragment(&self, shared: &Self::SharedData, _uniform: &Self::Uniform) -> Vec4 {
-        let shade = (0.3 + shared.normal.dot(&Vec3::new(0.5, 1.0, 0.5))).min(1.0);
+        let shade = (0.3 + shared.normal.dot(Vec3::new(0.5, 1.0, 0.5))).min(1.0);
         <DynamicImage as Texture>::color_at(
             &self.image,
             shared.texture_coords.x,
@@ -80,7 +79,7 @@ impl FragmentShader for NormalShadingFragmentShader {
     type SharedData = StandardShaderData;
 
     fn fragment(&self, shared: &Self::SharedData, _uniform: &Self::Uniform) -> Vec4 {
-        let shading = shared.normal.dot(&Vec3::new(0.0, 1.0, 0.0)).min(0.8);
+        let shading = shared.normal.dot(Vec3::new(0.0, 1.0, 0.0)).min(0.8);
         Vec4::new(shading, shading, shading, 1.0)
     }
 }
@@ -143,7 +142,7 @@ impl VertexShader for D3VertexShader {
         vertex: &Self::VertexData,
         uniform: &Self::Uniform,
     ) -> (Vec4, Self::SharedData) {
-        let vpos = glm::Vec4::new(vertex.position.x, vertex.position.y, vertex.position.z, 1.0);
+        let vpos = Vec4::new(vertex.position.x, vertex.position.y, vertex.position.z, 1.0);
         let vertex_pos = (uniform.pvm.model * vpos).xyz();
         let final_pos = uniform.pvm.projection * uniform.pvm.view * uniform.pvm.model * vpos;
         let data = Self::SharedData {
@@ -161,32 +160,31 @@ impl FragmentShader for D3FragmentShader {
     type SharedData = D3ShareData;
 
     fn fragment(&self, shared: &Self::SharedData, uniform: &Self::Uniform) -> Vec4 {
-        let vertex_to_light = glm::normalize(&(uniform.light_pos - shared.vertex_pos));
-        let vertex_to_view = glm::normalize(&(uniform.viewpos - shared.vertex_pos));
+        let vertex_to_light = (uniform.light_pos - shared.vertex_pos).normalize();
+        let vertex_to_view = (uniform.viewpos - shared.vertex_pos).normalize();
         let tc = &shared.texture_coords;
 
         let glow = uniform.glow.color_at(tc.x, tc.y);
         let normal = uniform.normals.color_at(tc.x, tc.y).xyz().normalize();
         let ambient = uniform.ambient_color * uniform.ambient_intensity;
-        let diffuse = glm::dot(&vertex_to_light, &normal).max(0.0)
-            * uniform.light_color
-            * uniform.light_intensity;
-        let specular = glm::matrix_comp_mult(
-            &uniform
-                .specular
-                .color_at(shared.texture_coords.x, shared.texture_coords.y)
-                .xyz(),
-            &uniform.light_color,
-        ) * glm::dot(&reflect(&vertex_to_light, &normal), &vertex_to_view)
-            .max(0.0)
-            .powf(32.0)
+        let diffuse =
+            vertex_to_light.dot(normal).max(0.0) * uniform.light_color * uniform.light_intensity;
+        let specular = (uniform
+            .specular
+            .color_at(shared.texture_coords.x, shared.texture_coords.y)
+            .xyz()
+            * uniform.light_color)
+            * reflect(vertex_to_light, normal)
+                .dot(vertex_to_view)
+                .max(0.0)
+                .powf(32.0)
             * 32.0;
         let light = ambient + diffuse + specular;
 
         let color = uniform
             .diffuse
             .color_at(shared.texture_coords.x, shared.texture_coords.y);
-        let final_color = Vec4::new(light.x, light.y, light.z, 1.0).component_mul(&color) + glow;
+        let final_color = Vec4::new(light.x, light.y, light.z, 1.0) * color + glow;
         final_color
     }
 }

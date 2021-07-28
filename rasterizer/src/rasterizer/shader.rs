@@ -47,6 +47,9 @@ impl_interpolate!(f32);
 impl_interpolate!(Vec2);
 impl_interpolate!(Vec3);
 impl_interpolate!(Vec4);
+impl_interpolate!(Mat2);
+impl_interpolate!(Mat3);
+impl_interpolate!(Mat4);
 
 impl Interpolate for f64 {
     fn interpolate(v0: &Self, v1: &Self, v2: &Self, r0: f32, r1: f32, r2: f32) -> Self {

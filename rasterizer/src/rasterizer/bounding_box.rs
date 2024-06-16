@@ -32,8 +32,8 @@ impl BoundingBox {
         }
 
         let maxt = self.y.max(other.y);
-        let minb= (self.y + self.h).min(other.y + other.h);
-        
+        let minb = (self.y + self.h).min(other.y + other.h);
+
         if maxt > minb {
             return None;
         }

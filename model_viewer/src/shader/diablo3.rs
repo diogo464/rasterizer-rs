@@ -1,4 +1,4 @@
-use glam::{Vec2, Vec3, Vec4, Vec4Swizzles as _};
+use glam::{Mat3, Vec2, Vec3, Vec4, Vec4Swizzles as _};
 use rasterizer::{FragmentShader, Interpolate, VertexShader};
 
 use crate::{model::ModelVertex, texture::Texture};
@@ -24,6 +24,8 @@ pub struct D3ShareData {
     texture_coords: Vec2,
     normal: Vec3,
     vertex_pos: Vec3,
+    tangent: Vec3,
+    bitangent: Vec3,
 }
 
 pub struct D3VertexShader;
@@ -42,8 +44,10 @@ impl VertexShader for D3VertexShader {
         let final_pos = uniform.pvm.projection * uniform.pvm.view * uniform.pvm.model * vpos;
         let data = Self::SharedData {
             texture_coords: vertex.texture,
-            normal: vertex.normal,
+            normal: (uniform.pvm.model * vertex.normal.extend(1.0)).xyz(),
             vertex_pos,
+            tangent: (uniform.pvm.model * vertex.tangent.extend(1.0)).xyz(),
+            bitangent: (uniform.pvm.model * vertex.bitangent.extend(1.0)).xyz(),
         };
         (final_pos, data)
     }
@@ -55,16 +59,23 @@ impl FragmentShader for D3FragmentShader {
     type SharedData = D3ShareData;
 
     fn fragment(&self, shared: &Self::SharedData, uniform: &Self::Uniform) -> Vec4 {
+        let uv = shared.texture_coords;
         let vertex_to_light = (uniform.light_position - shared.vertex_pos).normalize();
         let vertex_to_view = (uniform.view_pos - shared.vertex_pos).normalize();
-        let tc = &shared.texture_coords;
 
-        let glow = uniform.glow.sample(*tc);
-        let normal = uniform.normals.sample(*tc).xyz().normalize();
+        let glow_sample = uniform.glow.sample(uv);
+        let tangent_sample = uniform.normals.sample(uv).xyz();
+        let diffuse_sample = uniform.diffuse.sample(uv).xyz();
+        let specular_sample = uniform.specular.sample(uv).xyz();
+
+        let ts_mat = Mat3::from_cols(shared.tangent, shared.bitangent, shared.normal);
+        let ts_normal = (2.0 * tangent_sample) - 1.0;
+        let normal = (ts_mat * ts_normal).normalize();
+
         let ambient = uniform.ambient_color * uniform.ambient_intensity;
         let diffuse =
             vertex_to_light.dot(normal).max(0.0) * uniform.light_color * uniform.light_intensity;
-        let specular = (uniform.specular.sample(shared.texture_coords).xyz() * uniform.light_color)
+        let specular = (specular_sample * uniform.light_color)
             * reflect(vertex_to_light, normal)
                 .dot(vertex_to_view)
                 .max(0.0)
@@ -72,8 +83,8 @@ impl FragmentShader for D3FragmentShader {
             * 32.0;
         let light = ambient + diffuse + specular;
 
-        let color = uniform.diffuse.sample(shared.texture_coords);
-        let final_color = Vec4::new(light.x, light.y, light.z, 1.0) * color + glow;
+        let final_color =
+            Vec4::new(light.x, light.y, light.z, 1.0) * diffuse_sample.extend(1.0) + glow_sample;
         final_color
     }
 }

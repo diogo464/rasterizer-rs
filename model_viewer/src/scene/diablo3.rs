@@ -1,4 +1,4 @@
-use glam::{Mat4, Vec3, Vec4};
+use glam::{Mat4, Vec3};
 
 use crate::{
     model::Model,
@@ -45,11 +45,11 @@ impl DiabloScene {
     pub fn load() -> Self {
         let model = "models/diablo3/diablo3_pose.obj";
         let diffuse = "models/diablo3/diablo3_pose_diffuse.tga";
-        let normal = "models/diablo3/diablo3_pose_nm.tga";
+        let _normal = "models/diablo3/diablo3_pose_nm.tga";
         let glow = "models/diablo3/diablo3_pose_glow.tga";
-        let _tangent = "models/diablo3/diablo3_pose_nm_tangent.tga";
+        let tangent = "models/diablo3/diablo3_pose_nm_tangent.tga";
         let specular = "models/diablo3/diablo3_pose_spec.tga";
-        Self::new(model, diffuse, normal, glow, specular)
+        Self::new(model, diffuse, tangent, glow, specular)
     }
 }
 

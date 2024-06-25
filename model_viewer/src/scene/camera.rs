@@ -40,7 +40,7 @@ impl Camera {
     }
 
     pub fn generate_projection_matrix(&self) -> Mat4 {
-        Mat4::perspective_rh(self.fov, 16.0 / 9.0, 0.1, 100.0)
+        Mat4::perspective_rh(self.fov, 16.0 / 9.0, 0.1, 1000.0)
     }
 
     pub fn generate_view_matrix(&self) -> Mat4 {

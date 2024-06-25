@@ -7,50 +7,75 @@ pub mod scene;
 pub mod shader;
 pub mod texture;
 
+use clap::{Parser, ValueEnum};
 use glam::Vec3;
 use rasterizer::Rasterizer;
-use scene::{DiabloScene, ModelViewer, Scene};
+use scene::{DiabloScene, ModelViewer, PBRScene, Scene};
 
 use sdl2::event::Event;
 use sdl2::keyboard::Keycode;
 use sdl2::rect::Rect;
 use sdl2::{pixels::PixelFormatEnum, render::TextureAccess};
 
-fn main() {
-    const WIDTH: u32 = 1280;
-    const HEIGHT: u32 = 720;
+#[derive(Debug, Clone, Copy, Default, ValueEnum)]
+enum ArgsScene {
+    #[default]
+    Diablo,
+    Cerberus,
+}
 
+#[derive(Debug, Parser)]
+struct Args {
+    #[clap(long, default_value = "1280")]
+    width: u32,
+
+    #[clap(long, default_value = "720")]
+    height: u32,
+
+    #[clap(long, default_value = "diablo")]
+    scene: ArgsScene,
+}
+
+fn main() {
+    let args = Args::parse();
+    let mut scene: Box<dyn Scene> = match args.scene {
+        ArgsScene::Diablo => Box::new(DiabloScene::load()),
+        ArgsScene::Cerberus => Box::new(PBRScene::load()),
+    };
+    run(args.width, args.height, &mut *scene)
+}
+
+fn run(width: u32, height: u32, scene: &mut dyn Scene) {
     let sdl_context = sdl2::init().unwrap();
     let video_subsystem = sdl_context.video().unwrap();
     sdl_context.mouse().set_relative_mouse_mode(true);
     sdl_context.mouse().show_cursor(false);
 
     let window = video_subsystem
-        .window("Model viewer", WIDTH, HEIGHT)
+        .window("Model viewer", width, height)
         .position_centered()
         .build()
         .unwrap();
 
     let mut canvas = window.into_canvas().build().unwrap();
-    let fullscreen_rect = Rect::new(0, 0, WIDTH, HEIGHT);
+    let fullscreen_rect = Rect::new(0, 0, width, height);
     let texture_creator = canvas.texture_creator();
     let mut display_texture = texture_creator
         .create_texture(
             PixelFormatEnum::RGBA32,
             TextureAccess::Streaming,
-            WIDTH,
-            HEIGHT,
+            width,
+            height,
         )
         .expect("Failed to create texture");
 
     let mut model_viewer = ModelViewer {
         camera: Default::default(),
         light_position: Vec3::new(0.0, 0.0, 3.0),
-        rasterizer: Rasterizer::new(WIDTH, HEIGHT),
+        rasterizer: Rasterizer::new(width, height),
     };
-    let mut scene: Box<dyn Scene> = Box::new(DiabloScene::load());
 
-    let mut pixels: [u8; (4 * WIDTH * HEIGHT) as usize] = [0; (4 * WIDTH * HEIGHT) as usize];
+    let mut pixels = vec![0u8; (4 * width * height) as usize];
     let mut event_pump = sdl_context.event_pump().unwrap();
     let mut timer = std::time::Instant::now();
     'running: loop {
@@ -93,7 +118,7 @@ fn main() {
             });
 
         display_texture
-            .update(fullscreen_rect, &pixels, (4 * WIDTH) as usize)
+            .update(fullscreen_rect, &pixels, (4 * width) as usize)
             .unwrap();
         canvas
             .copy(&display_texture, fullscreen_rect, fullscreen_rect)

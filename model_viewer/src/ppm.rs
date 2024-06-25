@@ -55,7 +55,7 @@ impl PPMImage {
                 )
                 .unwrap();
             }
-            write!(contents, "\n").unwrap();
+            writeln!(contents).unwrap();
         }
 
         w.write_all(contents.as_bytes())

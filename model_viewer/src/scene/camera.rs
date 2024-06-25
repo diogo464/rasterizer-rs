@@ -27,11 +27,11 @@ impl Default for Camera {
 
 impl Camera {
     // 85 deg
-    pub const MIN_PITCH: f32 = -1.48352986;
-    pub const MAX_PITCH: f32 = 1.48352986;
+    pub const MIN_PITCH: f32 = -1.483_529_8;
+    pub const MAX_PITCH: f32 = 1.483_529_8;
 
     // 5 deg
-    pub const FOV_MIN: f32 = 0.0872664626;
+    pub const FOV_MIN: f32 = 0.087_266_46;
     // 160 deg
     pub const FOV_MAX: f32 = 2.7925268;
 

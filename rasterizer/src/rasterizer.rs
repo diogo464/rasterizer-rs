@@ -537,7 +537,7 @@ mod thread_pool {
             Self { channels, injector }
         }
 
-        pub fn run_jobs<'j, F, D>(&mut self, runner: F, mut data: Vec<D>)
+        pub fn run_jobs<'j, F, D>(&mut self, runner: F, data: Vec<D>)
         where
             F: FnMut(D) + Send + Clone + 'j,
             D: Send + 'j,
@@ -612,9 +612,9 @@ where
     processed_triangles_buffer: &'a mut [ProcessedModelFace<SD>],
 }
 
-fn prepare_vertex_stage_jobs<'a, V, U, VS, SD>(
-    data: PrepareVertexStageJobsData<'a, V, U, VS, SD>,
-) -> Vec<VertexJobData<'a, V, U, VS, SD>>
+fn prepare_vertex_stage_jobs<V, U, VS, SD>(
+    data: PrepareVertexStageJobsData<'_, V, U, VS, SD>,
+) -> Vec<VertexJobData<'_, V, U, VS, SD>>
 where
     V: Send + Sync,
     U: Send + Sync,
@@ -655,7 +655,7 @@ where
     job_data
 }
 
-fn execute_vertex_job<'a, V, U, VS, SD>(data: VertexJobData<'a, V, U, VS, SD>)
+fn execute_vertex_job<V, U, VS, SD>(data: VertexJobData<'_, V, U, VS, SD>)
 where
     V: Send + Sync,
     U: Send + Sync,
@@ -677,9 +677,9 @@ where
             &vertices[i2 as usize],
         );
 
-        let (vertex0, vertex0_data) = vertex_shader.vertex(v0, &uniform);
-        let (vertex1, vertex1_data) = vertex_shader.vertex(v1, &uniform);
-        let (vertex2, vertex2_data) = vertex_shader.vertex(v2, &uniform);
+        let (vertex0, vertex0_data) = vertex_shader.vertex(v0, uniform);
+        let (vertex1, vertex1_data) = vertex_shader.vertex(v1, uniform);
+        let (vertex2, vertex2_data) = vertex_shader.vertex(v2, uniform);
         let v0w = vertex0.w;
         let v1w = vertex1.w;
         let v2w = vertex2.w;
@@ -733,9 +733,9 @@ struct PrepareRasterizerJobsData<'a, SD> {
 //    }
 //    jobs
 //}
-fn prepare_rasterizer_jobs<'a, SD>(
-    data: PrepareRasterizerJobsData<'a, SD>,
-) -> Vec<RastersizerJobData<'a, SD>> {
+fn prepare_rasterizer_jobs<SD>(
+    data: PrepareRasterizerJobsData<'_, SD>,
+) -> Vec<RastersizerJobData<'_, SD>> {
     let mut jobs = Vec::new();
     let blocks_per_thread = ((data.blocks.len() as u32) / data.thread_count).max(1);
 
@@ -754,7 +754,7 @@ fn prepare_rasterizer_jobs<'a, SD>(
     jobs
 }
 
-fn execute_rasterizer_job<'a, SD>(data: RastersizerJobData<'a, SD>) {
+fn execute_rasterizer_job<SD>(data: RastersizerJobData<'_, SD>) {
     let width = data.fb_width;
     let height = data.fb_height;
     let processed_triangles = data.processed_triangles;
@@ -846,9 +846,9 @@ where
     uniform: &'a U,
 }
 
-fn prepare_fragment_jobs<'a, U, SD, FS>(
-    data: PrepareFragmentJobsData<'a, U, SD, FS>,
-) -> Vec<FragmentJobData<'a, U, SD, FS>>
+fn prepare_fragment_jobs<U, SD, FS>(
+    data: PrepareFragmentJobsData<'_, U, SD, FS>,
+) -> Vec<FragmentJobData<'_, U, SD, FS>>
 where
     U: Sync,
     SD: Interpolate + Sync,
@@ -880,7 +880,7 @@ where
     jobs
 }
 
-fn execute_fragment_job<'a, U, SD, FS>(data: FragmentJobData<'a, U, SD, FS>)
+fn execute_fragment_job<U, SD, FS>(data: FragmentJobData<'_, U, SD, FS>)
 where
     U: Sync,
     SD: Interpolate + Sync,
@@ -909,7 +909,7 @@ where
             );
             *color = data
                 .fragment_shader
-                .fragment(&interpolated, &data.uniform)
+                .fragment(&interpolated, data.uniform)
                 .xyz();
         }
     }

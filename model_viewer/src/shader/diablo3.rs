@@ -83,8 +83,6 @@ impl FragmentShader for D3FragmentShader {
             * 32.0;
         let light = ambient + diffuse + specular;
 
-        let final_color =
-            Vec4::new(light.x, light.y, light.z, 1.0) * diffuse_sample.extend(1.0) + glow_sample;
-        final_color
+        Vec4::new(light.x, light.y, light.z, 1.0) * diffuse_sample.extend(1.0) + glow_sample
     }
 }

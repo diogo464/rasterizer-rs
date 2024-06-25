@@ -25,7 +25,7 @@ impl StructInfo {
             ..
         }) = derive.data
         {
-            named.iter().map(|f| f.clone()).collect()
+            named.iter().cloned().collect()
         } else {
             return Err(Error::new(
                 Span::call_site(),
@@ -60,7 +60,7 @@ fn generate_impl(derive: DeriveInput) -> Result<TokenStream> {
     let field_assignements: Vec<TokenStream> = struct_info
         .fields
         .iter()
-        .map(|f| generate_field_interpolation(f))
+        .map(generate_field_interpolation)
         .collect();
 
     Ok(quote! {

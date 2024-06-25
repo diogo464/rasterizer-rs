@@ -60,19 +60,19 @@ fn read_obj_model<P: AsRef<Path>>(path: P) -> ObjModel {
                 let v1 = y_part.next().unwrap().parse::<usize>().unwrap() - 1;
                 let v2 = z_part.next().unwrap().parse::<usize>().unwrap() - 1;
 
-                let textures = if let Some(n0) = x_part.nth(0) {
+                let textures = if let Some(n0) = x_part.next() {
                     let t0 = n0.parse::<usize>().unwrap();
-                    let t1 = y_part.nth(0).unwrap().parse::<usize>().unwrap();
-                    let t2 = z_part.nth(0).unwrap().parse::<usize>().unwrap();
+                    let t1 = y_part.next().unwrap().parse::<usize>().unwrap();
+                    let t2 = z_part.next().unwrap().parse::<usize>().unwrap();
                     Some([t0 - 1, t1 - 1, t2 - 1])
                 } else {
                     None
                 };
 
-                let normals = if let Some(n0) = x_part.nth(0) {
+                let normals = if let Some(n0) = x_part.next() {
                     let n0 = n0.parse::<usize>().unwrap();
-                    let n1 = y_part.nth(0).unwrap().parse::<usize>().unwrap();
-                    let n2 = z_part.nth(0).unwrap().parse::<usize>().unwrap();
+                    let n1 = y_part.next().unwrap().parse::<usize>().unwrap();
+                    let n2 = z_part.next().unwrap().parse::<usize>().unwrap();
                     Some([n0 - 1, n1 - 1, n2 - 1])
                 } else {
                     None

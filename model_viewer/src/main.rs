@@ -97,6 +97,7 @@ fn run(width: u32, height: u32, scene: &mut dyn Scene) {
                 } => break 'running,
                 Event::MouseButtonDown { .. } => {
                     model_viewer.light_position = model_viewer.camera.position;
+                    println!("placing light at {}", model_viewer.camera.position);
                 }
                 _ => {}
             }
@@ -124,6 +125,6 @@ fn run(width: u32, height: u32, scene: &mut dyn Scene) {
             .copy(&display_texture, fullscreen_rect, fullscreen_rect)
             .unwrap();
         canvas.present();
-        print!("\r{:?}", model_viewer.rasterizer.frametime(),);
+        // print!("\r{:?}", model_viewer.rasterizer.frametime(),);
     }
 }

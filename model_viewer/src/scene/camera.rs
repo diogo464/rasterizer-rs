@@ -16,7 +16,7 @@ impl Default for Camera {
         Self {
             position: Vec3::new(0.9, 0.6, 0.0),
             fov: 90.0f32.to_radians(),
-            velocity: 1.0,
+            velocity: 3.0,
             target_dir: Vec3::default(),
             pitch: 0.0,
             yaw: 180.0f32.to_radians(),
@@ -69,6 +69,7 @@ impl Camera {
                     Keycode::Q => self.velocity -= 1.0,
                     Keycode::E => self.velocity += 1.0,
                     Keycode::Space => self.target_dir.y += 1.0,
+                    Keycode::V => self.target_dir.y -= 1.0,
                     _ => {}
                 };
             }
@@ -84,6 +85,7 @@ impl Camera {
                     Keycode::A => self.target_dir.x += 1.0,
                     Keycode::D => self.target_dir.x -= 1.0,
                     Keycode::Space => self.target_dir.y -= 1.0,
+                    Keycode::V => self.target_dir.y += 1.0,
                     _ => {}
                 };
             }

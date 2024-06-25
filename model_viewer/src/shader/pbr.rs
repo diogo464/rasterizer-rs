@@ -163,7 +163,7 @@ impl FragmentShader for PBRFragmentShader {
             Lo += (kD * albedo / PI + specular) * radiance * NdotL;
         }
 
-        let ambient = Vec3::splat(0.03) * albedo * ao;
+        let ambient = Vec3::splat(0.3) * albedo * ao;
         let mut color = ambient + Lo;
 
         color = color / (color + Vec3::splat(1.0));
